@@ -31,6 +31,7 @@ public class Main {
             arquivo, Paths.get("data", "index", "arvore_bplus.idx"));
     private final CrudIndexado crud = new CrudIndexado(indices);
 
+    @SuppressWarnings("try")
     public static void main(String[] args) {
         // Lock lateral cobre também CRUD, carga e ordenação herdados durante toda a sessão.
         try (BloqueioBase lock = BloqueioBase.adquirir(DB)) {
