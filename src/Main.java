@@ -4,6 +4,10 @@ import service.Importador;
 import service.OrdenacaoExterna;
 import service.GerenciadorIndices;
 import service.CrudIndexado;
+import service.BloqueioBase;
+import service.GerenciadorCompressao;
+import service.BuscaPadroes;
+import compressao.ArquivoComprimido.Algoritmo;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,7 +32,12 @@ public class Main {
     private final CrudIndexado crud = new CrudIndexado(indices);
 
     public static void main(String[] args) {
-        new Main().executar();
+        // Lock lateral cobre também CRUD, carga e ordenação herdados durante toda a sessão.
+        try (BloqueioBase lock = BloqueioBase.adquirir(DB)) {
+            new Main().executar();
+        } catch (IOException e) {
+            System.out.println("Não foi possível iniciar: " + e.getMessage());
+        }
     }
 
     private void executar() {
@@ -54,6 +63,7 @@ public class Main {
                     case 7: listar(); break;
                     case 8: arquivo.imprimirEstruturaFisica(System.out); break;
                     case 9: menuIndices(); break;
+                    case 10: menuTP3(); break;
                     case 0: System.out.println("Encerrando."); break;
                     default: System.out.println("Opção inválida.");
                 }
@@ -65,7 +75,7 @@ public class Main {
     }
 
     private void imprimirMenu() {
-        System.out.println("========== TP2 AEDS III - GRUPO 15 ==========");
+        System.out.println("========== TP3 AEDS III - GRUPO 15 ==========");
         System.out.println("Tema: Carros");
         System.out.println("Integrantes: Gabriel Benicio Fonseca e Rhayner Martins");
         System.out.println("1 - Carregar base de dados");
@@ -77,6 +87,7 @@ public class Main {
         System.out.println("7 - Listar registros ativos");
         System.out.println("8 - Visualizar estrutura física do arquivo");
         System.out.println("9 - TP2 — CRUD indexado");
+        System.out.println("10 - TP3 — Compressão e Casamento de Padrões");
         System.out.println("0 - Sair");
     }
 
@@ -261,6 +272,71 @@ public class Main {
 
     private void confirmarIndices() {
         System.out.println("Índices atualizados: B+, Hash Estendido, Lista Ano e Lista Características.");
+    }
+
+    private void menuTP3() {
+        GerenciadorCompressao compressao = new GerenciadorCompressao(DB, Paths.get("data", "compressao"), indices);
+        int opcao;
+        do {
+            System.out.println("========== TP3 — COMPRESSÃO E PADRÕES ==========");
+            System.out.println("1 - Comprimir base (Huffman e LZW)");
+            System.out.println("2 - Listar versões de compressão");
+            System.out.println("3 - Descomprimir/restaurar versão");
+            System.out.println("4 - Buscar padrão com KMP");
+            System.out.println("5 - Buscar padrão com BMH");
+            System.out.println("6 - Comparar buscas");
+            System.out.println("0 - Voltar");
+            opcao = lerInt("Escolha: ", -1);
+            try {
+                switch (opcao) {
+                    case 1: System.out.println(compressao.comprimir()); break;
+                    case 2: System.out.println(compressao.listarVersoes()); break;
+                    case 3:
+                        int versao = lerInt("Versão a restaurar: ", -1);
+                        try (GerenciadorCompressao.Preparacao p = compressao.prepararRestauracao(versao)) {
+                            System.out.println(p.resumo());
+                            System.out.println("A restauração substituirá dados.db e reconstruirá os quatro índices.");
+                            int escolha = lerInt("Restaurar: 1 - Huffman | 2 - LZW | 0 - Cancelar: ", -1);
+                            if (escolha == 0) break;
+                            if (escolha != 1 && escolha != 2) throw new IllegalArgumentException("Algoritmo inválido.");
+                            System.out.print("Digite SIM para restaurar: ");
+                            if (!scanner.nextLine().trim().equalsIgnoreCase("SIM")) {
+                                System.out.println("Restauração cancelada."); break;
+                            }
+                            p.restaurar(escolha == 1 ? Algoritmo.Huffman : Algoritmo.LZW);
+                            System.out.println("Base restaurada e quatro índices reconstruídos; configurações preservadas.");
+                        }
+                        break;
+                    case 4: buscarPadrao(BuscaPadroes.Metodo.KMP, false); break;
+                    case 5: buscarPadrao(BuscaPadroes.Metodo.BMH, false); break;
+                    case 6: buscarPadrao(BuscaPadroes.Metodo.KMP, true); break;
+                    case 0: break;
+                    default: System.out.println("Opção inválida.");
+                }
+            } catch (IOException | IllegalArgumentException e) {
+                System.out.println("Operação TP3 não concluída: " + e.getMessage());
+            }
+        } while (opcao != 0);
+    }
+
+    private void buscarPadrao(BuscaPadroes.Metodo metodo, boolean comparar) throws IOException {
+        String padrao = lerStringObrigatoria("Padrão no nome (ignora maiúsculas/minúsculas; preserva acentos): ");
+        BuscaPadroes busca = new BuscaPadroes(arquivo);
+        BuscaPadroes.Resultado resultado = busca.buscar(padrao, metodo);
+        System.out.println(resultado.metodo() + ": registros=" + resultado.total() + "; tempo_ns=" + resultado.nanos());
+        if (comparar) {
+            BuscaPadroes.Resultado outro = busca.buscar(padrao, BuscaPadroes.Metodo.BMH);
+            System.out.println(outro.metodo() + ": registros=" + outro.total() + "; tempo_ns=" + outro.nanos());
+            if (!resultado.itens().equals(outro.itens())) throw new IOException("Resultados KMP/BMH divergentes.");
+            System.out.println("Mesmos IDs e nomes: OK. Medição local inclui leitura e normalização.");
+        }
+        for (int inicio = 0; inicio < resultado.total(); inicio += 20) {
+            for (BuscaPadroes.Item item : resultado.pagina(inicio))
+                System.out.println("ID=" + item.id() + " | " + item.nome());
+            if (inicio + 20 >= resultado.total()) break;
+            System.out.print("Mostrar mais 20? (s/N): ");
+            if (!scanner.nextLine().trim().equalsIgnoreCase("s")) break;
+        }
     }
 
     private void reconstruirIndices() throws IOException {
