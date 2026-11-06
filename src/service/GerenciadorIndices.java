@@ -110,22 +110,22 @@ public class GerenciadorIndices {
 
     public void reconstruir(int ordem) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        ArvoreBPlus.validarOrdem(ordem);
-        dados.garantirArquivo();
-        String antes = estadoDados();
-        marcar(ordem);
-        Path temp = Files.createTempFile(indice.toAbsolutePath().getParent(), "bplus-", ".tmp");
-        Files.delete(temp); // criar() exige destino novo; é exclusivamente o temporário desta operação.
-        try {
-            try (ArvoreBPlus arvore = ArvoreBPlus.criar(temp, ordem)) {
-                dados.percorrerAtivos(arvore::inserir);
-                arvore.validar(null);
-            }
-            if (secundarios.ativo()) secundarios.reconstruir();
-            if (!antes.equals(estadoDados())) throw new IOException("Dados alterados durante reconstrução.");
-            substituir(temp, indice);
-            concluir();
-        } finally { Files.deleteIfExists(temp); }
+            ArvoreBPlus.validarOrdem(ordem);
+            dados.garantirArquivo();
+            String antes = estadoDados();
+            marcar(ordem);
+            Path temp = Files.createTempFile(indice.toAbsolutePath().getParent(), "bplus-", ".tmp");
+            Files.delete(temp); // criar() exige destino novo; é exclusivamente o temporário desta operação.
+            try {
+                try (ArvoreBPlus arvore = ArvoreBPlus.criar(temp, ordem)) {
+                    dados.percorrerAtivos(arvore::inserir);
+                    arvore.validar(null);
+                }
+                if (secundarios.ativo()) secundarios.reconstruir();
+                if (!antes.equals(estadoDados())) throw new IOException("Dados alterados durante reconstrução.");
+                substituir(temp, indice);
+                concluir();
+            } finally { Files.deleteIfExists(temp); }
         }
     }
 
@@ -134,11 +134,11 @@ public class GerenciadorIndices {
      */
     public void reconstruirTodos(int ordem, long quantidadeInicial) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        ArvoreBPlus.validarOrdem(ordem);
-        HashEstendido.capacidadePara(quantidadeInicial);
-        marcar(ordem);
-        secundarios.configurar(quantidadeInicial);
-        reconstruir(ordem);
+            ArvoreBPlus.validarOrdem(ordem);
+            HashEstendido.capacidadePara(quantidadeInicial);
+            marcar(ordem);
+            secundarios.configurar(quantidadeInicial);
+            reconstruir(ordem);
         }
     }
 
@@ -252,71 +252,71 @@ public class GerenciadorIndices {
 
     public ArquivoSequencial.InfoRegistro criarComPosicao(Carro carro) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        conferir();
-        ArquivoSequencial.InfoRegistro registro;
-        try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
-            marcar(arvore.getOrdem());
-            registro = dados.createComPosicao(carro);
-            arvore.inserir(registro.id, registro.posicao);
-            if (secundarios.ativo()) secundarios.inserir(carro, registro.posicao);
-        }
-        concluir();
-        return registro;
+            conferir();
+            ArquivoSequencial.InfoRegistro registro;
+            try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
+                marcar(arvore.getOrdem());
+                registro = dados.createComPosicao(carro);
+                arvore.inserir(registro.id, registro.posicao);
+                if (secundarios.ativo()) secundarios.inserir(carro, registro.posicao);
+            }
+            concluir();
+            return registro;
         }
     }
 
     public boolean atualizar(Carro carro) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        conferir();
-        try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
-            long anterior = arvore.buscar(carro.getId());
-            if (anterior == -1) return false;
-            atualizarNaPosicao(anterior, carro);
-            return true;
-        }
+            conferir();
+            try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
+                long anterior = arvore.buscar(carro.getId());
+                if (anterior == -1) return false;
+                atualizarNaPosicao(anterior, carro);
+                return true;
+            }
         }
     }
 
     /** A posição já veio da estrutura escolhida; B+ participa apenas da manutenção. */
     long atualizarNaPosicao(long anterior, Carro carro) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        conferir();
-        long nova;
-        try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
-            Carro antigo = dados.readAtPosition(anterior, carro.getId());
-            marcar(arvore.getOrdem());
-            nova = dados.updateAtPosition(anterior, carro);
-            if (!arvore.atualizarPosicao(carro.getId(), nova)) throw inconsistente();
-            if (secundarios.ativo()) secundarios.atualizar(antigo, carro, nova);
-        }
-        concluir();
-        return nova;
+            conferir();
+            long nova;
+            try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
+                Carro antigo = dados.readAtPosition(anterior, carro.getId());
+                marcar(arvore.getOrdem());
+                nova = dados.updateAtPosition(anterior, carro);
+                if (!arvore.atualizarPosicao(carro.getId(), nova)) throw inconsistente();
+                if (secundarios.ativo()) secundarios.atualizar(antigo, carro, nova);
+            }
+            concluir();
+            return nova;
         }
     }
 
     public boolean excluir(int id) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        conferir();
-        try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
-            long posicao = arvore.buscar(id);
-            if (posicao == -1) return false;
-            excluirNaPosicao(posicao, id);
-            return true;
-        }
+            conferir();
+            try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
+                long posicao = arvore.buscar(id);
+                if (posicao == -1) return false;
+                excluirNaPosicao(posicao, id);
+                return true;
+            }
         }
     }
 
     void excluirNaPosicao(long posicao, int id) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        conferir();
-        try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
-            Carro antigo = dados.readAtPosition(posicao, id);
-            marcar(arvore.getOrdem());
-            dados.deleteAtPosition(posicao, id);
-            if (!arvore.remover(id)) throw inconsistente();
-            if (secundarios.ativo()) secundarios.remover(antigo);
-        }
-        concluir();
+            conferir();
+            try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
+                Carro antigo = dados.readAtPosition(posicao, id);
+                marcar(arvore.getOrdem());
+                dados.deleteAtPosition(posicao, id);
+                if (!arvore.remover(id)) throw inconsistente();
+                if (secundarios.ativo()) secundarios.remover(antigo);
+            }
+            concluir();
         }
     }
 
@@ -328,13 +328,13 @@ public class GerenciadorIndices {
      */
     public <T> T executarAlteracaoSequencial(Operacao<T> operacao) throws IOException {
         try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
-        if (!ativo()) return operacao.executar();
-        conferir();
-        int ordem = ordem();
-        marcar(ordem);
-        T resultado = operacao.executar();
-        reconstruir(ordem);
-        return resultado;
+            if (!ativo()) return operacao.executar();
+            conferir();
+            int ordem = ordem();
+            marcar(ordem);
+            T resultado = operacao.executar();
+            reconstruir(ordem);
+            return resultado;
         }
     }
 
