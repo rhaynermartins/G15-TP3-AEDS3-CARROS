@@ -1,5 +1,5 @@
 @echo off
-for %%T in (TesteTP1 TesteBPlus TesteHash TesteListas TesteFase2 TesteTP2) do (
+for %%T in (TesteTP1 TesteBPlus TesteHash TesteListas TesteFase2 TesteTP2 TesteCompressao TestePadroes TesteTP3) do (
     java -Xmx512m -cp out %%T
     if errorlevel 1 exit /b 1
 )
