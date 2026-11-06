@@ -9,5 +9,7 @@ temp/*
 data/dados.db
 data/dados_ordenados.db
 data/index/
+data/compressao/
+data/.*.tp3.lock
 vehicles.csv
 craigslist-carstrucks-data*.zip
