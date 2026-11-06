@@ -24,6 +24,7 @@ import java.util.Set;
  * O marcador persistente evita usar índices após uma operação interrompida.
  * Não há rollback dos dados: uma falha exige reconstruir a partir da base ativa.
  */
+@SuppressWarnings("try")
 public class GerenciadorIndices {
     private final ArquivoSequencial dados;
     private final Path indice, marca, assinatura;
@@ -108,6 +109,7 @@ public class GerenciadorIndices {
     }
 
     public void reconstruir(int ordem) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         ArvoreBPlus.validarOrdem(ordem);
         dados.garantirArquivo();
         String antes = estadoDados();
@@ -124,17 +126,20 @@ public class GerenciadorIndices {
             substituir(temp, indice);
             concluir();
         } finally { Files.deleteIfExists(temp); }
+        }
     }
 
     /** Ativação explícita: quantidade inicial recebida, nunca inferida de ultimoId/ativos.
      * Reconstruções seguintes reutilizam fase2.meta e não dependem do CSV.
      */
     public void reconstruirTodos(int ordem, long quantidadeInicial) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         ArvoreBPlus.validarOrdem(ordem);
         HashEstendido.capacidadePara(quantidadeInicial);
         marcar(ordem);
         secundarios.configurar(quantidadeInicial);
         reconstruir(ordem);
+        }
     }
 
     public long quantidadeInicial() throws IOException { return secundarios.quantidadeInicial(); }
@@ -246,6 +251,7 @@ public class GerenciadorIndices {
     }
 
     public ArquivoSequencial.InfoRegistro criarComPosicao(Carro carro) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         conferir();
         ArquivoSequencial.InfoRegistro registro;
         try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
@@ -256,9 +262,11 @@ public class GerenciadorIndices {
         }
         concluir();
         return registro;
+        }
     }
 
     public boolean atualizar(Carro carro) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         conferir();
         try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
             long anterior = arvore.buscar(carro.getId());
@@ -266,10 +274,12 @@ public class GerenciadorIndices {
             atualizarNaPosicao(anterior, carro);
             return true;
         }
+        }
     }
 
     /** A posição já veio da estrutura escolhida; B+ participa apenas da manutenção. */
     long atualizarNaPosicao(long anterior, Carro carro) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         conferir();
         long nova;
         try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
@@ -281,9 +291,11 @@ public class GerenciadorIndices {
         }
         concluir();
         return nova;
+        }
     }
 
     public boolean excluir(int id) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         conferir();
         try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
             long posicao = arvore.buscar(id);
@@ -291,9 +303,11 @@ public class GerenciadorIndices {
             excluirNaPosicao(posicao, id);
             return true;
         }
+        }
     }
 
     void excluirNaPosicao(long posicao, int id) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         conferir();
         try (ArvoreBPlus arvore = ArvoreBPlus.abrir(indice)) {
             Carro antigo = dados.readAtPosition(posicao, id);
@@ -303,6 +317,7 @@ public class GerenciadorIndices {
             if (secundarios.ativo()) secundarios.remover(antigo);
         }
         concluir();
+        }
     }
 
     @FunctionalInterface
@@ -312,6 +327,7 @@ public class GerenciadorIndices {
      * Também protege ordenações: o marcador é gravado ANTES de mudar os endereços.
      */
     public <T> T executarAlteracaoSequencial(Operacao<T> operacao) throws IOException {
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
         if (!ativo()) return operacao.executar();
         conferir();
         int ordem = ordem();
@@ -319,6 +335,7 @@ public class GerenciadorIndices {
         T resultado = operacao.executar();
         reconstruir(ordem);
         return resultado;
+        }
     }
 
     public OrdenacaoExterna.ResultadoOrdenacao ordenar(Path temporarios, int caminhos,
