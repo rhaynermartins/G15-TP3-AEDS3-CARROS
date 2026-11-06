@@ -139,6 +139,54 @@ public class GerenciadorIndices {
 
     public long quantidadeInicial() throws IOException { return secundarios.quantidadeInicial(); }
 
+    /** Recebe uma cópia já descomprimida. O marcador antecede a troca dos bytes;
+     * falha na reconstrução conserva backup e impede buscas indexadas.
+     */
+    @SuppressWarnings("try")
+    public void restaurarBase(Path candidato) throws IOException {
+        if (candidato.toAbsolutePath().normalize().equals(dados.getCaminho().toAbsolutePath().normalize()))
+            throw new IOException("Restauração exige um temporário distinto.");
+        try (BloqueioBase lock = BloqueioBase.adquirir(dados.getCaminho())) {
+            if (!Files.isRegularFile(candidato) || Files.size(candidato) < 4)
+                throw new IOException("Base restaurada sem cabeçalho.");
+            ArquivoSequencial copia = new ArquivoSequencial(candidato);
+            int ultimo = copia.getUltimoId();
+            Set<Integer> ativos = new HashSet<>();
+            try {
+                for (ArquivoSequencial.InfoRegistro r : copia.inspecionar()) {
+                    if (ultimo < 0 || r.id < 1 || r.id > ultimo || (r.lapide != 0 && r.lapide != 1))
+                        throw new IOException("Registro físico restaurado inválido.");
+                    if (r.lapide == 0) {
+                        if (!ativos.add(r.id)) throw new IOException("ID ativo duplicado.");
+                        copia.readAtPosition(r.posicao, r.id);
+                    }
+                }
+            } catch (RuntimeException e) { throw new IOException("Base restaurada inválida.", e); }
+            if (ultimo < 0) throw new IOException("ultimoId restaurado inválido.");
+            if (ativo()) conferir();
+            int ordem = ativo() ? ordemConfigurada() : 32;
+            long inicial = fase2Ativa() ? quantidadeInicial() : 100000;
+            Path backup = Files.createTempFile(dados.getCaminho().toAbsolutePath().getParent(),
+                    "dados_pre_restauracao-", ".bak");
+            Files.copy(dados.getCaminho(), backup, StandardCopyOption.REPLACE_EXISTING);
+            try (RandomAccessFile f = new RandomAccessFile(backup.toFile(), "rw")) { f.getFD().sync(); }
+            try (RandomAccessFile f = new RandomAccessFile(candidato.toFile(), "rw")) { f.getFD().sync(); }
+            marcar(ordem);
+            try { substituir(candidato, dados.getCaminho()); }
+            catch (IOException troca) {
+                // Mesmo se o sistema tiver efetuado parcialmente a troca, o backup é íntegro.
+                try { substituir(backup, dados.getCaminho()); reconstruirTodos(ordem, inicial); }
+                catch (IOException retorno) { troca.addSuppressed(retorno); }
+                throw new IOException("Substituição não concluída; recuperação tentada. Backup: " + backup, troca);
+            }
+            try { reconstruirTodos(ordem, inicial); }
+            catch (IOException | RuntimeException e) {
+                throw new IOException("Base restaurada; índices pendentes. Reconstrua todos. Backup preservado: " + backup, e);
+            }
+            Files.deleteIfExists(backup);
+        }
+    }
+
     public void reconstruirTodos() throws IOException {
         reconstruirTodos(ordemConfigurada(), quantidadeInicial());
     }
