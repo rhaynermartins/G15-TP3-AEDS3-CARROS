@@ -105,3 +105,81 @@ Algoritmos TP1, base CSV e documentação das Fases 1/2: preservados
 Vídeo do TP1: preservado byte a byte
 Dados binários, índices, metadados, temporários e classes: não versionados
 Pendente: FASE FINAL VÍDEO
+
+TP3 — FASE 1 — 06/11/2026
+Os resultados TP1/TP2 acima são históricos e foram preservados.
+Base de código: main TP2 b459f485d449beeb5964c9e22a9093d271f8570d.
+Ambiente: macOS, Temurin java/javac 25.0.2, -Xmx512m.
+Compilação do zero em diretório novo com javac -Xlint:all: OK, sem avisos.
+Sem Maven: projeto Java simples, preservando o comando de compilação existente.
+
+REGRESSÃO FINAL
+TesteTP1: OK; carga, CRUD, dois updates, duas ordenações, CRUD após ordenar.
+TesteBPlus: OK; ordens 3 a 9, 1200 operações/oráculo, persistência e corrupção.
+TesteHash: OK; 1200 operações/oráculo, módulo, split, reabertura e corrupção.
+TesteListas: OK; 800 operações por tipo, normalização, interseção e persistência.
+TesteFase2: OK; coerência, ordenações, recarga e falhas parciais.
+TesteTP2: OK; CRUD localizado via BPLUS, HASH e LISTA, seleção/paginação/recuperação.
+TesteCompressao: OK; 158 entradas x 2 algoritmos, 1964 verificações.
+Vazio, um byte, símbolo único, 256 valores, zeros, repetição, KwKwK,
+reinicializações do dicionário e bloco aleatório de 2 MB: OK.
+Truncamento, metadados, SHA, frequências/payload, padding, lixo adicional
+e tentativa de sobrescrever destino existente: recusados.
+TestePadroes: OK; 20009 pares comparados com indexOf, Unicode, início/meio/fim,
+ausência, repetição, padrão maior/vazio, case folding, lápides e páginas de 20.
+TesteTP3: OK; versões 1/2 e preservação da posterior ao restaurar a anterior.
+Pares interrompidos, falta, metadados/truncamento e falha de escrita: recusados.
+Restaurados bytes, ultimoId e lápides; configuração B+ 4/população 100 preservada.
+Falha simulada de reconstrução: backup mantido, buscas bloqueadas e recuperação OK.
+Escritor concorrente em outra thread e segunda aplicação/JVM: recusados.
+Menu real: compressão, listagem, restauração confirmada, KMP, BMH,
+comparação, paginação e validação TP2: OK.
+
+BASE REAL — TesteTP3 --base-real
+Execução sobre cópia isolada importada do CSV oficial; principal não substituída.
+Importados: 100000; ignorados: 0.
+VERSÃO 1 — dados.db original: 10042038 bytes.
+Huffman: 6500202 bytes; ganho 35,27%; compressão 288776084 ns.
+LZW: 3978548 bytes; ganho 60,38%; compressão 341242750 ns.
+Menor arquivo: LZW. Compressão mais rápida nessa medição: Huffman.
+VERSÃO 2 — após Create temporário: 10042115 bytes.
+Huffman: 6500257 bytes; ganho 35,27%; compressão 280509833 ns.
+LZW: 3978595 bytes; ganho 60,38%; compressão 327739292 ns.
+Versão 2 preservada ao restaurar a versão 1.
+Descompressão/validação versão 1:
+Huffman: 356061792 ns.
+LZW: 274484250 ns.
+Mais rápida nessa medição: LZW.
+Ambos: tamanho, SHA-256 e igualdade byte a byte entre as saídas: OK.
+Base substituída pelo resultado Huffman validado, igual byte a byte à referência.
+SHA-256 original/restaurado:
+93c6dd4bfe465c4a9cad139ed55fe4eb3ac4d4cccaa338f3a6aef3ecce8882f0
+Cabeçalho restaurado: ultimoId=100000; lápides=0; ativos=100000.
+B+: ordem=32; altura=4; entradas=100000.
+Hash: população inicial=100000; capacidade=5000; p=5; buckets=32; entradas=100000.
+Lista Ano: 102 termos; 100000 postings.
+Lista Características: 47 termos; 535292 postings.
+Validação global antes e após CRUD posterior à restauração: OK.
+Esse CRUD gera e exclui ID 100001; estado final tem 100000 ativos e ultimoId=100001.
+Nova JVM: TesteTP3 --reabrir; sem reconstrução; quatro índices e seek: OK.
+
+CASAMENTO NA BASE REAL — comparação com oráculo independente, mesmos IDs/nomes
+Toyota: 9913 registros; KMP=2146553833 ns; BMH=3640274416 ns; ORACLE=OK.
+FORD: 15999 registros; KMP=2542024416 ns; BMH=2470029458 ns; ORACLE=OK.
+honda civic: 1662 registros; KMP=2304905084 ns; BMH=2623649625 ns; ORACLE=OK.
+não-existe-TP3: 0 registros; KMP=2398099125 ns; BMH=2277890875 ns; ORACLE=OK.
+silverado: 4021 registros; KMP=2232174625 ns; BMH=2121385250 ns; ORACLE=OK.
+Tempos incluem leitura/normalização/coleta, não apenas comparações.
+Medições locais simples, sujeitas a cache, JVM, disco e ordem de execução.
+Ganhos incluem overhead dos cabeçalhos. Não há afirmação universal de velocidade.
+
+PRESERVAÇÃO TP3
+CSV SHA-256:
+dca80b16146481edfb8c7daf7435456d137545013a6c410c66d830acf28f3363
+Entidade, formato dos dados e algoritmos anteriores: preservados.
+Escritas via Main/GerenciadorIndices e serviços TP3: lock cooperativo exclusivo.
+Não usar escritores externos que ignorem o protocolo de lock.
+Dados gerados, compressões, índices, backups e temporários: ignorados pelo Git.
+Testar.bat atualizado; execução Windows não verificada neste macOS.
+Checkpoint de implementação: checkpoint/tp3-fase-1; sem merge na main.
+Vídeo TP3: Fase 2 não iniciada. Aguardando revisão humana da Fase 1.
